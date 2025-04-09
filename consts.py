@@ -1,5 +1,5 @@
-MQTT_STATE_TOPIC = "{}/{}/value"
-MQTT_COMMAND_TOPIC = "{}/{}/set"
+MQTT_STATE_TOPIC = "{}/{}/{}/value"
+MQTT_COMMAND_TOPIC = "{}/{}/{}/set"
 MQTT_PROGRAM_STATUS = "{}/status"
 
 MQTT_PAYLOAD_ON = [b"on", b"an", b"1", b"true"]

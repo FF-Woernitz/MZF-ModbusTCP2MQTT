@@ -4,7 +4,7 @@ from queue import Queue
 from time import sleep
 
 import paho.mqtt.client as mqtt
-from pyModbusTCP.server import ModbusServer
+from pyModbusTCP.server import ModbusServer, DeviceIdentification
 
 from ModBusDataBank import ModbusDataBank
 from ModBusDataHandler import ModbusDataHandler
@@ -15,7 +15,8 @@ from consts import *
 def on_connect(client, userdata, flags, reason_code, properties):
     client.subscribe(
         [
-            (MQTT_COMMAND_TOPIC.format(MQTT_BASETOPIC, "+"), 0)
+            (MQTT_COMMAND_TOPIC.format(MQTT_BASETOPIC, "coil", "+"), 0),
+            (MQTT_COMMAND_TOPIC.format(MQTT_BASETOPIC, "dinput", "+"), 0)
         ]
     )
     client.publish(
@@ -23,14 +24,10 @@ def on_connect(client, userdata, flags, reason_code, properties):
     )
 
 
-def mqtt_publish(mqttc, item):
-    payload = "ON" if item[1] else "OFF"
-
-
 def on_message_cmd(mqtt_client, data_object, msg):
-    data = msg.topic.split("/")[1]
-    type = data.split("_")[0]
-    id = data.split("_")[1]
+    data = msg.topic.split("/")
+    type = data[1]
+    id = data[2]
 
     if not str(id).isdecimal():
         return ValueError("Invalid ID")
@@ -46,11 +43,11 @@ def on_message_cmd(mqtt_client, data_object, msg):
 
     if type == "coil" and id < MODBUS_COIL_SIZE:
         data_object["databank"].set_coils(id, [payload])
-        data_object["mqtt_queue"].put([MQTT_STATE_TOPIC.format(MQTT_BASETOPIC, f"coil_{id}"), payload])
+        data_object["mqtt_queue"].put([MQTT_STATE_TOPIC.format(MQTT_BASETOPIC, "coil", str(id)), payload])
         print(f"Update from MQTT: coil_{id}: {payload}")
     elif type == "dinput" and id < MODBUS_DINPUTS_SIZE:
         data_object["databank"].set_discrete_inputs(id, [payload])
-        data_object["mqtt_queue"].put([MQTT_STATE_TOPIC.format(MQTT_BASETOPIC, f"dinput_{id}"), payload])
+        data_object["mqtt_queue"].put([MQTT_STATE_TOPIC.format(MQTT_BASETOPIC, "dinput", str(id)), payload])
         print(f"Update from MQTT: dinput_{id}: {payload}")
     else:
         return ValueError("Invalid Argument")
@@ -71,7 +68,10 @@ def create_mqtt_client(databank, mqtt_queue):
     mqttc.on_connect = on_connect
 
     mqttc.message_callback_add(
-        MQTT_COMMAND_TOPIC.format(MQTT_BASETOPIC, "+"), on_message_cmd
+        MQTT_COMMAND_TOPIC.format(MQTT_BASETOPIC, "coil", "+"), on_message_cmd
+    )
+    mqttc.message_callback_add(
+        MQTT_COMMAND_TOPIC.format(MQTT_BASETOPIC, "dinput", "+"), on_message_cmd
     )
 
     if MQTT_USER != '':
@@ -94,7 +94,8 @@ def main():
         mqtt_queue = Queue()
 
         databank = ModbusDataBank(mqtt_queue, backup)
-        server = ModbusServer(host="0.0.0.0", port=502, data_hdl=ModbusDataHandler(databank), no_block=True)
+        device_identification = DeviceIdentification(vendor_name=b"FF-Woernitz", product_code=b"ModBus2MQTT", major_minor_revision=b"1.0.0", product_name=b"test1", objects_id={0: b'test1', 2: b'test2'})
+        server = ModbusServer(host="0.0.0.0", port=502, data_hdl=ModbusDataHandler(databank), device_id=device_identification, no_block=True)
 
         mqttc = create_mqtt_client(databank, mqtt_queue)
         mqttc.loop_start()
@@ -105,7 +106,7 @@ def main():
         while True:
             if not mqtt_queue.empty():
                 item = mqtt_queue.get()
-                mqttc.publish(item[0], "ON" if item[1] else "OFF", retain=True)
+                mqttc.publish(item[0], "ON" if item[1] else "OFF")
             else:
                 sleep(0.1)
 

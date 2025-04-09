@@ -21,14 +21,14 @@ class ModbusDataBank(DataBank):
     def on_coils_change(self, address, from_value, to_value, srv_info):
         msg = 'change in coil space [{0!r:^5} > {1!r:^5}] at @ 0x{2:04X}'
         print(msg.format(from_value, to_value, address))
-        self.mqtt_queue.put([MQTT_STATE_TOPIC.format(MQTT_BASETOPIC, f"coil_{address}"), to_value])
+        self.mqtt_queue.put([MQTT_STATE_TOPIC.format(MQTT_BASETOPIC, "coil", str(address)), to_value])
 
     def init(self):
         for i in range(MODBUS_COIL_SIZE):
-            self.mqtt_queue.put([MQTT_STATE_TOPIC.format(MQTT_BASETOPIC, f"coil_{i}"), self.get_coils(i)[0]])
+            self.mqtt_queue.put([MQTT_STATE_TOPIC.format(MQTT_BASETOPIC, "coil", str(i)), self.get_coils(i)[0]])
         for i in range(MODBUS_DINPUTS_SIZE):
             self.mqtt_queue.put(
-                [MQTT_STATE_TOPIC.format(MQTT_BASETOPIC, f"dinput_{i}"), self.get_discrete_inputs(i)[0]])
+                [MQTT_STATE_TOPIC.format(MQTT_BASETOPIC, "dinput", str(i)), self.get_discrete_inputs(i)[0]])
 
     def get_backup_config(self):
         conf = {
