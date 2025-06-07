@@ -71,6 +71,9 @@ for _x in os.environ:
             logger.error(f"Invalid env parameter {_x}")
             exit(1)
         if CONFIG.get(_x[env_prefix_len:].lower()) != os.environ[_x]:
+            if _x[env_prefix_len:].upper() in LIST_CONFS:
+                CONFIG[_x[env_prefix_len:].lower()] = [s.strip() for s in os.environ[_x].split(",")]
+                continue
             if type(CONFIG[_x[env_prefix_len:].lower()]) is int:
                 CONFIG[_x[env_prefix_len:].lower()] = int(os.environ[_x])
             if type(CONFIG[_x[env_prefix_len:].lower()]) is bool:

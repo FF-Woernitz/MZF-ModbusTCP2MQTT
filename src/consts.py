@@ -32,6 +32,8 @@ DEFAULT_MODBUS_ALLOWED_IPS = []
 DEFAULT_LOG_LEVEL = "info"
 DEFAULT_LOG_COLOR = False
 
+LIST_CONFS = ["MODBUS_ALLOWED_IPS"]
+
 ALL_SUPPORTED_LOG_LEVELS = {
     "critical": logging.CRITICAL,
     "error": logging.ERROR,
