@@ -1,4 +1,6 @@
-FROM python:3
+FROM python:3-alpine
+
+RUN apk add --no-cache py-pip
 
 WORKDIR /opt/app
 COPY requirements.txt ./
