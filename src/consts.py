@@ -20,7 +20,7 @@ CONF_LOG_LEVEL = "log_level"
 CONF_LOG_COLOR = "log_color"
 
 DEFAULT_CONFIG_FILE = "config.yaml"
-DEFAULT_BACKUP_FILE = "backup.json"
+DEFAULT_BACKUP_FILE = "/opt/backup/backup.json"
 DEFAULT_MQTT_SERVER = "127.0.0.1"
 DEFAULT_MQTT_PORT = 1883
 DEFAULT_MQTT_USERNAME = ""
