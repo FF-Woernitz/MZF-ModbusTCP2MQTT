@@ -1,7 +1,7 @@
 from pyModbusTCP.server import DataBank
 
-from config import Config
-from consts import *
+from .consts import *
+from .config import Config
 
 logging.basicConfig(format=LOG_FORMAT)
 logger = logging.getLogger(__name__)

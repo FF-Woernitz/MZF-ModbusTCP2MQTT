@@ -2,7 +2,7 @@ from pyModbusTCP.constants import EXP_ILLEGAL_FUNCTION
 from pyModbusTCP.server import DataHandler
 
 from .consts import *
-from config import Config
+from .config import Config
 
 logging.basicConfig(format=LOG_FORMAT)
 logger = logging.getLogger(__name__)

@@ -6,11 +6,11 @@ from time import sleep
 import paho.mqtt.client as mqtt
 from pyModbusTCP.server import ModbusServer, DeviceIdentification
 
-from ModBusDataBank import ModbusDataBank
-from ModBusDataHandler import ModbusDataHandler
+from .ModBusDataBank import ModbusDataBank
+from .ModBusDataHandler import ModbusDataHandler
 
+from .consts import *
 from .config import Config
-from consts import *
 
 logging.basicConfig(format=LOG_FORMAT)
 logger = logging.getLogger(__name__)
