@@ -1,125 +1,87 @@
-import json
 import os
-from queue import Queue
-from time import sleep
 
-import paho.mqtt.client as mqtt
-from pyModbusTCP.server import ModbusServer, DeviceIdentification
+import yaml
+import argparse
 
-from ModBusDataBank import ModbusDataBank
-from ModBusDataHandler import ModbusDataHandler
-from config import *
-from consts import *
+from src.consts import *
+from src.modbus2mqtt import main
 
-
-def on_connect(client, userdata, flags, reason_code, properties):
-    client.subscribe(
-        [
-            (MQTT_COMMAND_TOPIC.format(MQTT_BASETOPIC, "coil", "+"), 0),
-            (MQTT_COMMAND_TOPIC.format(MQTT_BASETOPIC, "dinput", "+"), 0)
-        ]
-    )
-    client.publish(
-        MQTT_PROGRAM_STATUS.format(MQTT_BASETOPIC), MQTT_AVAILABLE, retain=True
-    )
+logging.basicConfig(format=LOG_FORMAT)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
-def on_message_cmd(mqtt_client, data_object, msg):
-    data = msg.topic.split("/")
-    type = data[1]
-    id = data[2]
-
-    if not str(id).isdecimal():
-        return ValueError("Invalid ID")
-
-    id = int(id)
-
-    if msg.payload.lower() in MQTT_PAYLOAD_ON:
-        payload = True
-    elif msg.payload.lower() in MQTT_PAYLOAD_OFF:
-        payload = False
-    else:
-        return ValueError("Invalid Argument")
-
-    if type == "coil" and id < MODBUS_COIL_SIZE:
-        data_object["databank"].set_coils(id, [payload])
-        data_object["mqtt_queue"].put([MQTT_STATE_TOPIC.format(MQTT_BASETOPIC, "coil", str(id)), payload])
-        print(f"Update from MQTT: coil_{id}: {payload}")
-    elif type == "dinput" and id < MODBUS_DINPUTS_SIZE:
-        data_object["databank"].set_discrete_inputs(id, [payload])
-        data_object["mqtt_queue"].put([MQTT_STATE_TOPIC.format(MQTT_BASETOPIC, "dinput", str(id)), payload])
-        print(f"Update from MQTT: dinput_{id}: {payload}")
-    else:
-        return ValueError("Invalid Argument")
-
-
-def create_mqtt_client(databank, mqtt_queue):
-    mqttc = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2,
-                        client_id="MZF-ModbusRTU2MQTT",
-                        userdata={
-                            "databank": databank,
-                            "mqtt_queue": mqtt_queue
-                        }
-    )
-
-    mqttc.will_set(
-        MQTT_PROGRAM_STATUS.format(MQTT_BASETOPIC), MQTT_NOT_AVAILABLE, retain=True
-    )
-    mqttc.on_connect = on_connect
-
-    mqttc.message_callback_add(
-        MQTT_COMMAND_TOPIC.format(MQTT_BASETOPIC, "coil", "+"), on_message_cmd
-    )
-    mqttc.message_callback_add(
-        MQTT_COMMAND_TOPIC.format(MQTT_BASETOPIC, "dinput", "+"), on_message_cmd
-    )
-
-    if MQTT_USER != '':
-        mqttc.username_pw_set(MQTT_USER, MQTT_PASSWORD)
-
-    mqttc.connect(MQTT_SERVER, MQTT_PORT, 180)
-    return mqttc
-
-
-def main():
-    mqttc = None
-    server = None
-    databank = None
-    backup = None
-
-    if os.path.isfile(BACKUP_FILE):
-        with open(BACKUP_FILE) as f:
-            backup = json.load(f)
+def load_config_file(path, create):
+    """Load configuration from yaml file."""
     try:
-        mqtt_queue = Queue()
+        with open(path, "r") as infile:
+            logger.info(f"Loading configuration from {path}")
+            try:
+                configuration = yaml.safe_load(infile)
+                if not configuration:
+                    logger.error(f"Error during loading configuration file {path}")
+                    quit(1)
+                config = CONF_SCHEMA(configuration)
+            except vol.MultipleInvalid as error:
+                logger.error(f"In configuration file {path}: {error}")
+                quit(1)
+    except FileNotFoundError:
+        if create:
+            logger.info("No configuration file found, creating a new one")
+            try:
+                with open(path, "w", encoding="utf8") as outfile:
+                    yaml.dump(CONF_SCHEMA({}), outfile, default_flow_style=False, allow_unicode=True)
+            except Exception as err:
+                logger.error(f"Could not save configuration: {err}")
+            logger.info("Example configuration has been created. Please edit the configuration now!")
+            quit(0)
+        else:
+            logger.info("No configuration file found. Skipping configuration file.")
+            config = CONF_SCHEMA({})
+    return config
 
-        databank = ModbusDataBank(mqtt_queue, backup)
-        device_identification = DeviceIdentification(vendor_name=b"FF-Woernitz", product_code=b"ModBus2MQTT", major_minor_revision=b"1.0.0", product_name=b"test1", objects_id={0: b'test1', 2: b'test2'})
-        server = ModbusServer(host="0.0.0.0", port=502, data_hdl=ModbusDataHandler(databank), device_id=device_identification, no_block=True)
 
-        mqttc = create_mqtt_client(databank, mqtt_queue)
-        mqttc.loop_start()
+parser = argparse.ArgumentParser(argument_default=argparse.SUPPRESS)
+parser.add_argument(f"--{CONF_CONFIG}", help="configuration file", default=DEFAULT_CONFIG_FILE)
+parser.add_argument(
+    f"--{CONF_CONFIG_EXAMPLE.replace('_', '-')}", help="create configuration file example", action='store_true',
+    default=False
+)
+parser.add_argument(f"--{CONF_BACKUP_FILE.replace('_', '-')}", help="backup file")
+parser.add_argument(f"--{CONF_MQTT_SERVER.replace('_', '-')}", help="MQTT server")
+parser.add_argument(f"--{CONF_MQTT_PORT.replace('_', '-')}", help="MQTT port", type=int)
+parser.add_argument(f"--{CONF_MQTT_USERNAME.replace('_', '-')}", help="MQTT username")
+parser.add_argument(f"--{CONF_MQTT_PASSWORD.replace('_', '-')}", help="MQTT password")
+parser.add_argument(f"--{CONF_MQTT_BASE_TOPIC.replace('_', '-')}", help="MQTT base topic")
+parser.add_argument(f"--{CONF_MODBUS_COIL_SIZE.replace('_', '-')}", help="Count of Coils", type=int)
+parser.add_argument(f"--{CONF_MODBUS_DINP_SIZE.replace('_', '-')}", help="Count of DInputs", type=int)
+parser.add_argument(f"--{CONF_MODBUS_ALLOWED_IPS.replace('_', '-')}", help="Allowed IPs for modbus", action='append')
+parser.add_argument(f"--{CONF_LOG_LEVEL.replace('_', '-')}", help="Log level", choices=ALL_SUPPORTED_LOG_LEVELS)
+parser.add_argument(f"--{CONF_LOG_COLOR.replace('_', '-')}", help="Coloring output", action="store_true")
 
-        server.start()
-        databank.init()
+args = parser.parse_args()
+args = vars(args)
 
-        while True:
-            if not mqtt_queue.empty():
-                item = mqtt_queue.get()
-                mqttc.publish(item[0], "ON" if item[1] else "OFF")
+CONFIG = load_config_file(args[CONF_CONFIG], args[CONF_CONFIG_EXAMPLE])
+
+for _x in os.environ:
+    if _x.startswith(ENV_PREFIX):
+        env_prefix_len = len(ENV_PREFIX)
+        if _x[env_prefix_len:].lower() not in CONFIG:
+            logger.error(f"Invalid env parameter {_x}")
+            exit(1)
+        if CONFIG.get(_x[env_prefix_len:].lower()) != os.environ[_x]:
+            if type(CONFIG[_x[env_prefix_len:].lower()]) is int:
+                CONFIG[_x[env_prefix_len:].lower()] = int(os.environ[_x])
+            if type(CONFIG[_x[env_prefix_len:].lower()]) is bool:
+                CONFIG[_x[env_prefix_len:].lower()] = bool(os.environ[_x])
             else:
-                sleep(0.1)
+                CONFIG[_x[env_prefix_len:].lower()] = os.environ[_x]
 
-    except KeyboardInterrupt:
-        if mqttc is not None:
-            mqttc.loop_stop()
-        if server is not None:
-            server.stop()
-        if databank is not None:
-            with open(BACKUP_FILE, "w") as f:
-                json.dump(databank.get_backup_config(), f)
-        print("Shutting down")
+args.pop(CONF_CONFIG)
+args.pop(CONF_CONFIG_EXAMPLE)
+for key in args:
+    if CONFIG.get(key) != args[key]:
+        CONFIG[key] = args[key]
 
-
-if __name__ == "__main__":
-    main()
+main(CONFIG)
