@@ -12,6 +12,7 @@ class ModbusDataHandler(DataHandler):
     def __init__(self):
         super()
         self.config = Config()
+        logger.setLevel(ALL_SUPPORTED_LOG_LEVELS[self.config[CONF_LOG_LEVEL]])
 
     def read_coils(self, address, count, srv_info):
         logger.debug(f"Client {srv_info.client.address} read coils. Start: {address} Count: {count}")

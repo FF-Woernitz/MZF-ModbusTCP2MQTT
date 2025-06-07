@@ -12,6 +12,7 @@ class ModbusDataBank(DataBank):
     def __init__(self, mqtt_queue, backup_config=None):
         self.mqtt_queue = mqtt_queue
         self.config = Config()
+        logger.setLevel(ALL_SUPPORTED_LOG_LEVELS[self.config[CONF_LOG_LEVEL]])
 
         super().__init__(coils_size=self.config[CONF_MODBUS_COIL_SIZE], d_inputs_size=self.config[CONF_MODBUS_DINP_SIZE], h_regs_size=0,
                          i_regs_size=0)
