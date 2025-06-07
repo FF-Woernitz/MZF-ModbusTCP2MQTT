@@ -76,7 +76,7 @@ for _x in os.environ:
                 continue
             if type(CONFIG[_x[env_prefix_len:].lower()]) is int:
                 CONFIG[_x[env_prefix_len:].lower()] = int(os.environ[_x])
-            if type(CONFIG[_x[env_prefix_len:].lower()]) is bool:
+            elif type(CONFIG[_x[env_prefix_len:].lower()]) is bool:
                 CONFIG[_x[env_prefix_len:].lower()] = bool(os.environ[_x])
             else:
                 CONFIG[_x[env_prefix_len:].lower()] = os.environ[_x]

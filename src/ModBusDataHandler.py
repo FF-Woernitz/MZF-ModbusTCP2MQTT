@@ -9,8 +9,8 @@ logger = logging.getLogger(__name__)
 
 
 class ModbusDataHandler(DataHandler):
-    def __init__(self):
-        super()
+    def __init__(self, databank):
+        super().__init__(databank)
         self.config = Config()
         logger.setLevel(ALL_SUPPORTED_LOG_LEVELS[self.config[CONF_LOG_LEVEL]])
 
